@@ -3,7 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// Firebase Console에서 복사한 설정
+// Firebase Console 설정
 const firebaseConfig = {
   apiKey: "AIzaSyAP0pEA2ywGws1G3YNRSdNID-0G2aReo_E",
   authDomain: "tripapp-8fc99.firebaseapp.com",
@@ -17,7 +17,7 @@ const firebaseConfig = {
 // Firebase 초기화
 const app = initializeApp(firebaseConfig);
 
-// Firebase 서비스들
+// Firebase 에서 가져와서 사용할 기능들
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
