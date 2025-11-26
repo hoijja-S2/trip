@@ -4,9 +4,8 @@ import { View, Text, StyleSheet, TouchableOpacity,
   KeyboardAvoidingView, Platform, TouchableWithoutFeedback,
   Keyboard, TextInput, 
   Alert, Modal, ScrollView,} from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {useState} from "react";
-import {Calendar} from "react-native-calendar";
 import * as Location from "expo-location";
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -30,14 +29,14 @@ export default function WriteDiaryScreen({route, navigation}) {
     "기분, 풍경, 냄새... 무엇이 떠오르나요?"
   ]
   const transports = [
-    { id: 1, name: "도보",},
-    { id: 2, name: "자전거",},
-    { id: 3, name: "자동차",},
-    { id: 4, name: "버스",},
-    { id: 5, name: "지하철",},
-    { id: 6, name: "기차", },
-    { id: 7, name: "비행기",},
-    { id: 8, name: "배",},
+    { id: 1, name: "도보", icon: "walk" },
+    { id: 2, name: "자전거", icon: "bike" },
+    { id: 3, name: "자동차", icon: "car" },
+    { id: 4, name: "버스", icon: "bus" },
+    { id: 5, name: "지하철", icon: "subway" },
+    { id: 6, name: "기차", icon: "train" },
+    { id: 7, name: "비행기", icon: "airplane" },
+    { id: 8, name: "배", icon: "ferry" },
   ]
 
   const handleSearchLocation = async () => {
@@ -65,6 +64,16 @@ export default function WriteDiaryScreen({route, navigation}) {
       Alert.alert("오류 발생", error.message);
     }
   };
+  const handleTransportSelect = (transportId) => {
+  if (selectedTransport === transportId) {
+    // 이미 선택된 교통수단을 다시 누르면 선택 해제
+    setSelectedTransport(null);
+  } else {
+    // 새로운 교통수단 선택
+    setSelectedTransport(transportId);
+  }
+};
+
   const handleCamera = async () => {
     setShowUploadModal(false);
     
@@ -165,7 +174,9 @@ export default function WriteDiaryScreen({route, navigation}) {
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "android" ? "padding" : "height"}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}>
           {/* 날짜 선택 */}
           <View style={styles.dateRow}>
             <Text style={styles.TitleText}>여행일</Text>
@@ -188,7 +199,7 @@ export default function WriteDiaryScreen({route, navigation}) {
         {locationName && locationName !== "" ? (
           <View>
             <Text style={styles.LCTitle}>여행지</Text>
-            <Text style={styles.LCSerInput}>{locationName}</Text>
+            <Text style={styles.LCSearchInput}>{locationName}</Text>
             <TouchableOpacity style={styles.LCsearchButton}
               onPress={() => setLocationName("")}>
               <Text style={styles.LCsearchButtonText}>변경</Text>
@@ -203,19 +214,26 @@ export default function WriteDiaryScreen({route, navigation}) {
               onChangeText={setsearchLCT}>
             </TextInput>
             <TouchableOpacity style={styles.LCsearchButton} onPress={handleSearchLocation}>
+              <Text style={styles.modalOptionIcon}>📸</Text>
               <Text style={styles.LCsearchButtonText}>검색</Text>
             </TouchableOpacity>
           </View>
         )}
-        <Text style={styles.transportTitle}>타고 간 교통수단</Text>
+        <Text style={styles.transportTitle}>여정을 도와준 교통수단</Text>
         <View style={styles.transportGrid}>
           {transports.map((transport) => (
             <TouchableOpacity key={transport.id}
             style={[styles.transportButton, selectedTransport === transport.id && styles.selected]}
-            onPress={() => setSelectedTransport(transport.id)}>
-            <Text style={[styles.transportText, selectedTransport === transport.id && styles.selectedText]}>
-              {transport.name}
-            </Text>
+            onPress={() => handleTransportSelect(transport.id)}>
+              <MaterialCommunityIcons 
+                name={transport.icon} 
+                size={32} 
+                color={selectedTransport === transport.id ? '#0baefe' : '#666'}
+                style={styles.transportIcon}
+              />
+              <Text style={[styles.transportText, selectedTransport === transport.id && styles.selectedText]}>
+                {transport.name}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -289,13 +307,14 @@ export default function WriteDiaryScreen({route, navigation}) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 25,
+    padding: 30,
     backgroundColor: '#f8f9fa',
   },
   dateRow: {
   flexDirection: 'row',
   alignItems: 'center',
-  marginTop: 15,
+  marginTop: 10,
+  marginBottom: 15,
   },
   TitleText: {
     fontSize: 18,
@@ -306,17 +325,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 12,
     borderRadius: 8,
+    marginTop:10,
     flex: 1, // 남은 공간 차지
   },
   dateText: {
     fontSize: 16,
   },
-
   LCSearchInput: {
     backgroundColor: 'white',
     borderRadius: 7,
     height: 45,
-    
+    fontSize: 18
   },
   LCsearchButton:{
     alignItems: 'center',
@@ -335,10 +354,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 18,
     borderRadius: 7,
-    height: 230,
+    height: 180,
     color: '#000',
     backgroundColor: 'white',
-    marginBottom: 25,
+    marginBottom: 15,
   },
 
   // 교통수단 제목
@@ -346,7 +365,8 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '600',
     color: '#000',
-    marginBottom: 12,
+    marginBottom: 8,
+    marginTop: 12,
   },
 
   // 교통수단 선택 영역
@@ -354,7 +374,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 28,
+    marginBottom: 15,
+    marginTop: 8,
   },
   transportButton: {
     width: '23%',
@@ -380,9 +401,9 @@ const styles = StyleSheet.create({
   uploadPicture: {
     backgroundColor: '#0baefe',
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 15,
   },
   uploadText: {
     fontSize: 18,

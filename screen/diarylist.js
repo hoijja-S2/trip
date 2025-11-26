@@ -49,7 +49,7 @@ export default function DiaryListScreen({ navigation }) {
       <View style={styles.header}>
         <Text style={styles.title}>나의 여행일기</Text>
         <TouchableOpacity onPress={() => navigation.navigate('writediary')}>
-          <Ionicons name="add-circle" size={32} color="#42b1fa" />
+          <Ionicons style={styles.circle} name="add-circle" size={32} color="#42b1fa" />
         </TouchableOpacity>
       </View>
 
@@ -87,6 +87,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+
   },
   center: {
     flex: 1,
@@ -98,11 +99,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
+    height: 100,
     backgroundColor: 'white',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginTop: 27,
   },
   card: {
     backgroundColor: 'white',
@@ -129,6 +132,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#42b1fa',
     padding: 15,
     borderRadius: 10,
+  },
+  circle:{
+    marginTop: 32,
   },
   buttonText: {
     color: 'white',
