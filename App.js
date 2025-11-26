@@ -1,26 +1,63 @@
-import React from "react"; // React 불러오기
-import { NavigationContainer } from "@react-navigation/native"; // 네비게이션 컨테이너
-import { createStackNavigator } from "@react-navigation/stack"; // Stack 네비게이션 생성
+// App.js
+import React, {useState, useEffect} from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebaseConfig";
 
-import LoginScreen from "./LoginScreen"; // 로그인 화면 가져오기
-import HomeScreen from "./HomeScreen";   // 홈 화면 가져오기
+// 네가 작성한 화면 파일 불러오기
+import LoginScreen from "./screen/login";
+import HomeScreen from "./screen/home";
+import WriteDiaryScreen from "./screen/writediary";
+import Sign_upScreen from "./screen/sign_up";
+import DiaryListScreen from "./screen/diarylist";
+import DiaryDetailScreen from "./screen/diarydetail";
 
-const Stack = createStackNavigator(); // Stack Navigator 객체 생성
+const Stack = createStackNavigator();
 
-// 앱의 진입점 컴포넌트
 export default function App() {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+      },[]);
+
   return (
-    <NavigationContainer> 
-      {/* 네비게이션 상태를 관리하는 최상위 컨테이너 */}
-      
-      <Stack.Navigator initialRouteName="Login"> 
-        {/* 스택 네비게이터 설정, 첫 화면을 Login으로 지정 */}
-        
-        <Stack.Screen name="Login" component={LoginScreen} /> 
-        {/* "Login" 이라는 이름의 화면 = LoginScreen 컴포넌트 */}
-        
-        <Stack.Screen name="Home" component={HomeScreen} /> 
-        {/* "Home" 이라는 이름의 화면 = HomeScreen 컴포넌트 */}
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Home">
+        <Stack.Screen 
+          name="Home" 
+          component={HomeScreen} 
+          options={{ headerShown: false }} // 홈 화면은 헤더 숨김
+        />
+        <Stack.Screen 
+          name="Login" 
+          component={LoginScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="writediary" 
+          component={WriteDiaryScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="sign_up"
+          component={Sign_upScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="diarylist"
+          component={DiaryListScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="diarydetail"
+          component={DiaryDetailScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

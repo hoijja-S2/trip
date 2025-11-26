@@ -1,90 +1,244 @@
-// screens/HomeScreen.js
-import React, { useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Text, Alert } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import React, {useState, useRef, useEffect} from "react";
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, 
+  Alert, TouchableOpacity, Keyboard, TouchableWithoutFeedback, TextInput } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "../firebaseConfig";
+import MapView, { Marker } from "react-native-maps";
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import * as Location from "expo-location";
-import { Ionicons } from "@expo/vector-icons"; // 아이콘
-import { useNavigation } from "@react-navigation/native";
 
-export default function HomeScreen() {
-  const [region, setRegion] = useState(null);
-  const [visitedPlaces, setVisitedPlaces] = useState([]); // 방문한 장소 데이터 (나중에 Firestore 연결)
-  const navigation = useNavigation();
+export default function HomeScreen({navigation}) {
+  const [menuOpen, setMenuOpen] = useState(false); 
+  const [user, setUser] = useState(null); 
+  const [searchText, setSearchText] = useState("");
+  const [markerCoord, setMarkerCoord] = useState(null);
+  const mapRef = useRef(null);
+  const placesRef = useRef(null);
 
-  // ✅ 현재 위치 받아오기
   useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("권한 거부됨", "위치 접근 권한이 필요합니다.");
-        return;
-      }
-
-      let location = await Location.getCurrentPositionAsync({});
-      setRegion({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-    })();
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return unsubscribe;
   }, []);
 
-  // ✅ 일기 작성 화면으로 이동
-  const goToDiary = () => {
-    navigation.navigate("Diary"); // DiaryScreen 으로 이동
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      alert("로그아웃 완료");
+    } catch (error) {
+        alert("로그아웃 실패 : " + error.message);
+      }
+    };
+
+  // 기존 Geocoding 검색
+  const handleManualSearch = async () => {
+    if (!searchText) return;
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("위치 권한이 필요합니다.");
+        return;
+      }
+      let geo = await Location.geocodeAsync(searchText);
+      if (geo.length > 0) {
+        const { latitude, longitude } = geo[0];
+        setMarkerCoord({ latitude, longitude });
+        if (mapRef.current) {
+          mapRef.current.animateToRegion({
+            latitude,
+            longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }, 500);
+        }
+      } else {
+        Alert.alert("주소를 찾을 수 없습니다.");
+      }
+    } catch (error) {
+      Alert.alert("오류가 발생했습니다.", error.message);
+    }
   };
 
   return (
-    <View style={styles.container}>
-      {/* 지도 표시 */}
-      {region ? (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "android" ? "padding" : "height"}>
+        
         <MapView
+          ref={mapRef}
           style={styles.map}
-          region={region}
-          showsUserLocation={true}
-          followsUserLocation={true}
+          mapType="standard"
+          provider="google"
+          initialRegion={{
+            latitude: 37.5665,
+            longitude: 126.9780,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
         >
-          {/* 방문한 장소 마커 표시 (나중에 Firestore 데이터 불러올 때 사용) */}
-          {visitedPlaces.map((place, index) => (
+          {markerCoord && (
             <Marker
-              key={index}
-              coordinate={{
-                latitude: place.latitude,
-                longitude: place.longitude,
+              coordinate={markerCoord}
+              title="선택한 위치"
+              description={searchText || undefined}
+              onPress={async() => {
+                if(user){
+                  let realLC = searchText;
+                  try {
+                    let address = await Location.reverseGeocodeAsync({
+                      latitude: markerCoord.latitude,
+                      longitude: markerCoord.longitude,
+                    });
+                    if (address[0]) {
+                      const a = address[0];
+                      realLC = `${a.city || ""} ${a.district || ""} ${a.street || ""} ${a.name || ""}`.trim();
+                    }
+                  } catch (error) {
+                    console.log(error);
+                  }
+                  navigation.navigate("writediary",{
+                    latitude: markerCoord.latitude,
+                    longitude: markerCoord.longitude,
+                    locationName: realLC,
+                  });
+                  setMenuOpen(false);
+                } else {
+                  Alert.alert(
+                    "!로그인 필요!",
+                    "글쓰기를 하려면 로그인이 필요합니다.",
+                    [
+                      { text: "취소", style: "cancel"},
+                      { text: "로그인", onPress: () => navigation.navigate("Login")}
+                    ],
+                    {cancelable: true}
+                  );
+                }
               }}
-              title={place.name}
-              description={place.date}
-            />
-          ))}
-
-          {/* 이동 경로 표시 (예시) */}
-          {visitedPlaces.length > 1 && (
-            <Polyline
-              coordinates={visitedPlaces.map((p) => ({
-                latitude: p.latitude,
-                longitude: p.longitude,
-              }))}
-              strokeColor="#FF5733"
-              strokeWidth={4}
             />
           )}
         </MapView>
-      ) : (
-        <View style={styles.loadingContainer}>
-          <Text>지도를 불러오는 중...</Text>
-        </View>
-      )}
 
-      {/* 플로팅 버튼 */}
-      <TouchableOpacity style={styles.fab} onPress={goToDiary}>
-        <Ionicons name="add" size={32} color="white" />
-      </TouchableOpacity>
-    </View>
+        {/* 검색 영역 */}
+        <View style={styles.searchContainer}>
+          <GooglePlacesAutocomplete
+            ref={placesRef}
+            placeholder='주소를 입력하세요'
+            listViewDisplayed='auto'
+            debounce={200} // 0.2초로 짧게
+            minLength={1}
+            onPress={(data, details = null) => {
+              const location = details?.geometry?.location;
+              if (location) {
+                setMarkerCoord({
+                  latitude: location.lat,
+                  longitude: location.lng,
+                });
+                setSearchText(data.description);
+                if (mapRef.current) {
+                  mapRef.current.animateToRegion({
+                    latitude: location.lat,
+                    longitude: location.lng,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }, 500);
+                }
+              }
+            }}
+            query={{
+              key: 'AIzaSyDydQh4WXuFGqX6RzAmuxdYmrGJNOhfr1k',
+              language: 'ko',
+              types: 'establishment|geocode',
+            }}
+            fetchDetails={true}
+            textInputProps={{
+              onChangeText: (text) => setSearchText(text),
+              value: searchText,
+              autoFocus: false,
+            }}
+            enablePoweredByContainer={false}
+            styles={googlePlacesStyles}
+          />
+          
+          {/* 검색 버튼 */}
+          <TouchableOpacity 
+            style={styles.searchButton} 
+            onPress={handleManualSearch}>
+            <Text style={styles.searchButtonText}>검색</Text>
+          </TouchableOpacity>
+
+          {/* X 버튼 */}
+          {searchText.length > 0 && (
+            <TouchableOpacity
+              style={styles.clearButton}
+              onPress={() => {
+                setSearchText('');
+                if (placesRef.current) {
+                  placesRef.current.setAddressText('');
+                }
+              }}>
+              <Ionicons name="close-circle" size={20} color="#999"/>  
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => setMenuOpen(!menuOpen)}>
+          <Ionicons name="menu" size={28} color="black"/>
+        </TouchableOpacity>
+
+        {menuOpen && (
+          <View style={styles.menu}>
+            {user ? (
+              <>
+                <View style={styles.profileBox}>
+                  <Text style={styles.userEmail}>{user?.email || "사용자"}</Text>
+                </View>
+
+                <TouchableOpacity onPress={() => {
+                  setMenuOpen(false);
+                  navigation.navigate("diarylist");
+                }}>
+                  <Text style={styles.menuItem}>내 여행 목록</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => {
+                  setMenuOpen(false);
+                  navigation.navigate("writediary");
+                }}>
+                  <Text style={styles.menuItem}>일기 쓰기</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={handleLogout}>
+                  <Text style={[styles.menuItem, {color: "red"}]}>로그아웃</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity onPress={() => {
+                  setMenuOpen(false);
+                  navigation.navigate("Login");
+                }}>
+                  <Text style={styles.menuItem}>로그인</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={()=> {
+                  setMenuOpen(false);
+                  navigation.navigate("diarylist");
+                }}>
+                  <Text style={styles.menuItem}>내 여행 목록</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 
-// 🎨 스타일 정의
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -92,27 +246,86 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  fab: {
+  searchContainer: {
     position: "absolute",
-    bottom: 30,
+    top: 60,
+    left: 70,
     right: 20,
-    backgroundColor: "#007AFF",
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    shadowOffset: { width: 2, height: 2 },
-    elevation: 5, // 안드로이드 그림자
+    zIndex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+  searchButton: {
+    backgroundColor: '#0baefe',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  searchButtonText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  clearButton: {
+    position: 'absolute',
+    right: 10,
+    top: 8.5,
+    padding: 5,
+    zIndex: 2,
+  },
+  menuButton: {
+    position: "absolute",
+    top: 63,
+    left: 18,
+    backgroundColor: "white",
+    padding: 5,
+    borderRadius: 6,
+    elevation: 4,
+    zIndex: 15,
+  },
+  menu: {
+    position: "absolute",
+    top: 150,
+    left: 20,
+    backgroundColor: "white",
+    padding: 15,
+    borderRadius: 10,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    zIndex: 14,
+  },
+  profileBox: {
+    alignItems: "flex-start",
+    marginBottom: 10,
+  },
+  userEmail: {
+    fontWeight: "bold",
+  },
+  menuItem: {
+    fontSize: 16,
+    marginVertical: 8,
   },
 });
 
-
+const googlePlacesStyles = {
+  textInput: {
+    height: 45,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingRight: 40,
+    fontSize: 16,
+    shadowColor: "#000",
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  listView: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginTop: 5,
+  },
+};

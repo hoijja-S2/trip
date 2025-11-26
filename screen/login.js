@@ -1,50 +1,124 @@
-import React, { useState } from "react"; // React와 상태 관리 훅 useState 불러오기
-import { View, Text, TextInput, Button, StyleSheet } from "react-native"; // RN 기본 UI 컴포넌트 불러오기
-//상태관리훅: 컴포넌트 안에서 값이 바뀌면 화면을 다시 렌더링하도록 상태를 저장.
-//아이디 입력하면 한글자씩 내가 입력한 글자 보이는 기능 구현해줌ㅇㅇ
-// 기본 내보내기(export default) → 다른 파일에서 import 가능
-export default function LoginScreen({ navigation }) { 
-  // navigation: App.js의 Stack.Navigator에서 자동으로 전달되는 네비게이션 객체
+import React, { useState } from "react";
+import { View, Text, TextInput, StyleSheet, Alert, 
+  KeyboardAvoidingView, Platform, TouchableOpacity,
+  Keyboard, TouchableWithoutFeedback} from "react-native";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../firebaseConfig";
+import { useNavigation } from "@react-navigation/native";
 
-  const [email, setEmail] = useState("");      // 이메일 입력값 상태
-  const [password, setPassword] = useState(""); // 비밀번호 입력값 상태
 
-  const handleLogin = () => {
-    // 로그인 처리 로직 (Firebase 연동 가능)
-    navigation.replace("Home"); // 로그인 성공 시 Home 화면으로 이동
+export default function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const navigation = useNavigation();
+
+  const handleLogin = async () => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      navigation.reset({ index: 0, routes: [{ name: "Home" }] });
+    } catch (error) {
+      Alert.alert("로그인 실패", error.message);
+    }
   };
 
   return (
-    <View style={styles.container}> 
-      {/* 화면 전체 컨테이너 */}
-      
-      <Text style={styles.title}>로그인</Text> 
-      {/* 로그인 제목 텍스트 */}
-
-      <TextInput 
-        style={styles.input} 
-        placeholder="이메일"  // 입력 전 표시되는 안내문구
-        value={email}        // 현재 email 상태값
-        onChangeText={setEmail} // 입력이 바뀌면 setEmail로 상태 업데이트
-      />
-
-      <TextInput 
-        style={styles.input}
-        placeholder="비밀번호"
-        secureTextEntry // 비밀번호 입력시 **** 처리
-        value={password} 
-        onChangeText={setPassword} // 비밀번호 입력 업데이트
-      />
-
-      <Button title="로그인" onPress={handleLogin} /> 
-      {/* 로그인 버튼 클릭 시 handleLogin 실행 */}
-    </View>
-  );
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}
+    accessible={false}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "android" ? "padding" : "height"}
+        keyboardVerticalOffset={0}>
+        <Text style={styles.title}>Sign In</Text>
+        <TextInput
+          style={styles.inputID}
+          placeholder="ID(e-mail)"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.inputPS}
+          placeholder="Password"
+          value={password}
+          secureTextEntry={true}
+          autoCorrect={false}
+          autoComplete="off"
+          onChangeText={setPassword}
+        />
+        <TouchableOpacity style = {styles.Button} onPress = {handleLogin}>
+          <Text style = {styles.buttonText}>로그인</Text>
+        </TouchableOpacity>
+        <Text style={styles.link} onPress={() => navigation.navigate("sign_up")}>
+          No account? Sign up
+        </Text>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
+);
 }
 
-// 스타일 정의
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 20 }, // 화면 가운데 정렬 + 여백
-  title: { fontSize: 24, textAlign: "center", marginBottom: 20 }, // 큰 글씨 제목
-  input: { borderWidth: 1, marginBottom: 10, padding: 8, borderRadius: 5 } // 입력창 스타일
+  container: { 
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 15,
+    backgroundColor: '#f8f9fa',
+  },
+  titleContainer: {
+    marginBottom: 40,
+    alignItems: 'center',
+  },
+  title: { 
+    fontSize: 32,
+    fontWeight: "800", // 더 굵게
+    textAlign: "center",
+    color: '#1a1a1a',
+    letterSpacing: -0.5,
+  },
+  inputID: { 
+    borderColor: "#000000ff",
+    paddingHorizontal: 15,
+    fontSize: 20,
+    marginTop: 50,
+    marginLeft: 50,
+    marginRight: 50,
+    marginBottom: 10,
+    borderRadius: 8,
+    height: 60,
+    textAlignVertical: 'center',
+    color: '#000000',
+    backgroundColor: 'white',
+  },
+  inputPS: {
+    borderColor: "#000000ff",
+    paddingHorizontal: 15,
+    fontSize: 20,
+    marginLeft: 50,
+    marginRight: 50,
+    marginBottom: 10,
+    borderRadius: 8,
+    height: 60,
+    textAlignVertical: 'center',
+    color: '#000000',
+    backgroundColor: 'white'
+  },
+  link: {
+    color: "black",
+    textAlign: "center",
+    fontSize: 18,
+    marginTop: 20,
+  },
+  Button: {
+    backgroundColor: '#42b1faff',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+    marginLeft: 60,
+    marginRight: 60
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
 });
