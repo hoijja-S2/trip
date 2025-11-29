@@ -155,15 +155,10 @@ export default function WriteDiaryScreen({route, navigation}) {
 
   // 저장 버튼
   const handleSave = () => {
-    if (!writeText) {
-      Alert.alert('제목을 입력하세요.');
-      return;
-    }
     if (!locationName) {
-      Alert.alert('여행 장소를 입력하세요.');
+      Alert.alert('주소가 비어있습니다.', '여행지를 검색해주세요.');
       return;
     }
-    
     Alert.alert('저장 완료', '여행일기가 저장되었습니다!');
     // 여기에 Firebase 저장 로직 추가
     navigation.goBack();
@@ -251,6 +246,9 @@ export default function WriteDiaryScreen({route, navigation}) {
           <Text style={styles.uploadText}>📷 사진/동영상 추가</Text>
           {selectedMedia.length > 0 && (<Text style={styles.mediaCount}>{selectedMedia.length}개 선택됨</Text>
           )}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <Text style={styles.saveButtonText}>저장하기</Text>
         </TouchableOpacity>
       </ScrollView>
          {/* 업로드 옵션 모달 */}
@@ -374,8 +372,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 15,
-    marginTop: 8,
+    marginTop: 25,
   },
   transportButton: {
     width: '23%',
@@ -400,7 +397,7 @@ const styles = StyleSheet.create({
   // 사진 업로드 버튼
   uploadPicture: {
     backgroundColor: '#0baefe',
-    borderRadius: 12,
+    borderRadius: 7,
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 15,
@@ -415,6 +412,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'white',
     marginTop: 4,
+  },
+  saveButton: {
+    backgroundColor: '#0baefe',
+    paddingvartical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    height: 50,
+  },
+  saveButtonText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: '600',
+    paddingTop: 10,
   },
 
   // 모달 (그대로 유지)
