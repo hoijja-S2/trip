@@ -241,12 +241,13 @@ export default function WriteDiaryScreen({route, navigation}) {
           textAlignVertical="top"
           numberOfLines={10}
         />
-        <TouchableOpacity style={styles.uploadPicture}
-        onPress={()=> setShowUploadModal(true)}>
-          <Text style={styles.uploadText}>📷 사진/동영상 추가</Text>
-          {selectedMedia.length > 0 && (<Text style={styles.mediaCount}>{selectedMedia.length}개 선택됨</Text>
-          )}
-        </TouchableOpacity>
+          <TouchableOpacity
+          onPress={()=> setShowUploadModal(true)}
+          activeOpacity={0.7}>
+            <Text style={styles.uploadText}>📷 사진/동영상 추가</Text>
+            {selectedMedia.length > 0 && (<Text style={styles.mediaCount}>{selectedMedia.length}개 선택됨</Text>
+            )}
+          </TouchableOpacity>
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
           <Text style={styles.saveButtonText}>저장하기</Text>
         </TouchableOpacity>
@@ -322,8 +323,8 @@ const styles = StyleSheet.create({
   dateButton: {
     backgroundColor: 'white',
     padding: 12,
-    borderRadius: 8,
-    marginTop:10,
+    borderRadius: 7,
+    marginTop: 10,
     flex: 1, // 남은 공간 차지
   },
   dateText: {
@@ -332,8 +333,14 @@ const styles = StyleSheet.create({
   LCSearchInput: {
     backgroundColor: 'white',
     borderRadius: 7,
+    fontSize: 15,
     height: 45,
     fontSize: 18
+  },
+  LCTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
   },
   LCsearchButton:{
     alignItems: 'center',
@@ -372,7 +379,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 25,
+    marginTop: 10,
   },
   transportButton: {
     width: '23%',
@@ -386,28 +393,22 @@ const styles = StyleSheet.create({
   selected: {
     fontSize: 15,
     backgroundColor: '#e3f2fd',
-    borderWidth: 2,
     borderColor: '#0baefe',
   },
   selectedText: {
     color: '#3182CE',
     fontWeight: 'bold',
   },
-
   // 사진 업로드 버튼
   uploadPicture: {
-    backgroundColor: '#0baefe',
-    borderRadius: 7,
-    paddingVertical: 14,
-    alignItems: 'center',
+    alignItems: 'Left',
     marginBottom: 15,
   },
   uploadText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: 'Black',
   },
-
   mediaCount: {
     fontSize: 14,
     color: 'white',
@@ -416,7 +417,7 @@ const styles = StyleSheet.create({
   saveButton: {
     backgroundColor: '#0baefe',
     paddingvartical: 15,
-    borderRadius: 10,
+    borderRadius: 7,
     alignItems: 'center',
     height: 50,
   },
@@ -436,7 +437,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'white',
-    borderRadius: 16,
+    borderRadius: 7,
     padding: 20,
     width: '80%',
   },
@@ -469,7 +470,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     backgroundColor: '#f8f9fa',
-    borderRadius: 8,
+    borderRadius: 7,
   },
   modalCancelText: {
     fontSize: 16,
