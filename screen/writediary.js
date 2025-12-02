@@ -2,7 +2,7 @@
 import {React, useEffect} from "react";
 import { View, Text, StyleSheet, TouchableOpacity, 
   KeyboardAvoidingView, Platform, TouchableWithoutFeedback,
-  Keyboard, TextInput, 
+  Keyboard, TextInput, placesRef,
   Alert, Modal, ScrollView,} from "react-native";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {useState} from "react";
@@ -153,6 +153,14 @@ export default function WriteDiaryScreen({route, navigation}) {
   setPlaceholder(randomText);
   }, []);
 
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    setUser(currentUser);
+  });
+  return unsubscribe;
+}, []);
+
+
   // 저장 버튼
   const handleSave = () => {
     if (!locationName) {
@@ -191,29 +199,23 @@ export default function WriteDiaryScreen({route, navigation}) {
               onChange={onDateChange}
             />
           )}
-        {locationName && locationName !== "" ? (
-          <View>
-            <Text style={styles.LCTitle}>여행지</Text>
-            <Text style={styles.LCSearchInput}>{locationName}</Text>
-            <TouchableOpacity style={styles.LCsearchButton}
-              onPress={() => setLocationName("")}>
-              <Text style={styles.LCsearchButtonText}>변경</Text>
+          {!locationName || locationName === "" ? (
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Text style={styles.LCTitle}>여행지</Text>
+              <Text style={[styles.LCSearchInput, {color: '#999'}]}>여행지 선택</Text>
             </TouchableOpacity>
-          </View>
-        ) :(
-          <View>
-            <TextInput
-              style={styles.LCSearchInput}
-              placeholder = "여행지"
-              value = {searchLCT}
-              onChangeText={setsearchLCT}>
-            </TextInput>
-            <TouchableOpacity style={styles.LCsearchButton} onPress={handleSearchLocation}>
-              <Text style={styles.modalOptionIcon}>📸</Text>
-              <Text style={styles.LCsearchButtonText}>검색</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          ) : (
+            <View>
+              <Text style={styles.LCTitle}>여행지</Text>
+              <Text style={styles.LCSearchInput}>{locationName}</Text>
+              <TouchableOpacity style={styles.LCsearchButton}
+                onPress={() => setLocationName("")}>
+                <Text style={styles.LCsearchButtonText}>변경</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          // WriteDiary에서 돌아갈 때
+        <TouchableOpacity onPress={() => navigation.navigate("Home", { focusSearch: true })}></TouchableOpacity>
         <Text style={styles.transportTitle}>여정을 도와준 교통수단</Text>
         <View style={styles.transportGrid}>
           {transports.map((transport) => (
@@ -241,7 +243,7 @@ export default function WriteDiaryScreen({route, navigation}) {
           textAlignVertical="top"
           numberOfLines={10}
         />
-          <TouchableOpacity
+          <TouchableOpacity style={styles.uploadButtonContainer}
           onPress={()=> setShowUploadModal(true)}
           activeOpacity={0.7}>
             <Text style={styles.uploadText}>📷 사진/동영상 추가</Text>
@@ -334,6 +336,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 7,
     fontSize: 15,
+    paddingHorizontal: 13,
     height: 45,
     fontSize: 18
   },
@@ -359,7 +362,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 18,
     borderRadius: 7,
-    height: 180,
+    height: 210,
     color: '#000',
     backgroundColor: 'white',
     marginBottom: 15,
@@ -399,6 +402,10 @@ const styles = StyleSheet.create({
     color: '#3182CE',
     fontWeight: 'bold',
   },
+  uploadButtonContainer: {
+  width: 'auto',  // 또는 flexShrink: 1
+  alignSelf: 'flex-start',  // 왼쪽 정렬
+},
   // 사진 업로드 버튼
   uploadPicture: {
     alignItems: 'Left',
@@ -418,6 +425,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0baefe',
     paddingvartical: 15,
     borderRadius: 7,
+    marginTop: 10,
     alignItems: 'center',
     height: 50,
   },

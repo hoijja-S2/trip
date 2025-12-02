@@ -31,6 +31,13 @@ export default function HomeScreen({navigation}) {
         alert("로그아웃 실패 : " + error.message);
       }
     };
+    useEffect(() => {
+    if (route.params?.focusSearch) {
+      setTimeout(() => {
+        placesRef.current?.textInput?.focus();
+      }, 300);
+    }
+  }, [route.params?.focusSearch]);
 
   // 기존 Geocoding 검색
   const handleManualSearch = async () => {
@@ -233,6 +240,7 @@ export default function HomeScreen({navigation}) {
               </>
             )}
           </View>
+          
         )}
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
