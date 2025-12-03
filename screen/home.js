@@ -8,7 +8,7 @@ import MapView, { Marker } from "react-native-maps";
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import * as Location from "expo-location";
 
-export default function HomeScreen({navigation}) {
+export default function HomeScreen({navigation, route}) {
   const [menuOpen, setMenuOpen] = useState(false); 
   const [user, setUser] = useState(null); 
   const [searchText, setSearchText] = useState("");
@@ -23,6 +23,14 @@ export default function HomeScreen({navigation}) {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    if (route?.params?.focusSearch) {
+      setTimeout(() => {
+        placesRef.current?.textInput?.focus();
+      }, 300);
+    }
+  }, [route?.params?.focusSearch]);
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -30,16 +38,8 @@ export default function HomeScreen({navigation}) {
     } catch (error) {
         alert("로그아웃 실패 : " + error.message);
       }
-    };
-    useEffect(() => {
-    if (route.params?.focusSearch) {
-      setTimeout(() => {
-        placesRef.current?.textInput?.focus();
-      }, 300);
-    }
-  }, [route.params?.focusSearch]);
+  };
 
-  // 기존 Geocoding 검색
   const handleManualSearch = async () => {
     if (!searchText) return;
     try {
@@ -130,53 +130,64 @@ export default function HomeScreen({navigation}) {
 
         {/* 검색 영역 */}
         <View style={styles.searchContainer}>
-          <GooglePlacesAutocomplete
-            ref={placesRef}
-            placeholder='주소를 입력하세요'
-            listViewDisplayed='auto'
-            debounce={200} // 0.2초로 짧게
-            minLength={1}
-            onPress={(data, details = null) => {
-              const location = details?.geometry?.location;
-              if (location) {
-                setMarkerCoord({
-                  latitude: location.lat,
-                  longitude: location.lng,
-                });
-                setSearchText(data.description);
-                if (mapRef.current) {
-                  mapRef.current.animateToRegion({
-                    latitude: location.lat,
-                    longitude: location.lng,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }, 500);
-                }
-              }
-            }}
-            query={{
-              key: 'AIzaSyDydQh4WXuFGqX6RzAmuxdYmrGJNOhfr1k',
-              language: 'ko',
-              types: 'establishment|geocode',
-            }}
-            fetchDetails={true}
-            textInputProps={{
-              onChangeText: (text) => setSearchText(text),
-              value: searchText,
-              autoFocus: false,
-            }}
-            enablePoweredByContainer={false}
-            styles={googlePlacesStyles}
-          />
-          
-          {/* 검색 버튼 */}
+        <GooglePlacesAutocomplete
+        ref={placesRef}
+        placeholder="주소를 입력하세요"
+        fetchDetails={true}
+        debounce={200}
+        minLength={1}
+
+        onPress={(data, details) => {
+          const location = details?.geometry?.location;
+          if (!location) return;
+
+          const lat = location.lat;
+          const lng = location.lng;
+
+          // 검색창 값 변경
+          placesRef.current?.setAddressText(data.description);
+
+          // 지도 이동
+          setMarkerCoord({ latitude: lat, longitude: lng });
+          mapRef.current?.animateToRegion(
+            {
+              latitude: lat,
+              longitude: lng,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            },
+            500
+          );
+
+          // 자동완성 리스트 닫기
+          Keyboard.dismiss();
+        }}
+
+        query={{
+          key: "API_KEY",
+          language: "ko",
+          types: "geocode|establishment",
+        }}
+
+        textInputProps={{
+          onChangeText: (text) => {
+            console.log("입력됨:", text);
+            setSearchText(text);
+          },
+          // ❗ value 넣지 말 것 (자동완성 기능 망가짐)
+        }}
+
+        enablePoweredByContainer={false}
+        styles={googlePlacesStyles}
+      />
+
+
           <TouchableOpacity 
             style={styles.searchButton} 
             onPress={handleManualSearch}>
             <Text style={styles.searchButtonText}>검색</Text>
           </TouchableOpacity>
 
-          {/* X 버튼 */}
           {searchText.length > 0 && (
             <TouchableOpacity
               style={styles.clearButton}
@@ -240,7 +251,6 @@ export default function HomeScreen({navigation}) {
               </>
             )}
           </View>
-          
         )}
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
