@@ -1,29 +1,30 @@
-// writediart.js
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, 
   KeyboardAvoidingView, Platform, TouchableWithoutFeedback,
-  Keyboard, TextInput, Alert, Modal, ScrollView } from "react-native";
+  Keyboard, TextInput, Alert, Modal, ScrollView, ActivityIndicator } from "react-native";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from "expo-location";
 import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { auth, db } from "../firebaseConfig";
+import { auth, db, storage } from "../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { ref, uploadBytes } from "firebase/storage";
 
 export default function WriteDiaryScreen({route, navigation}) {
   const [writeText, setwriteText] = useState("");
   const [writeDiary, setwriteDiary] = useState("");
   const [selectedTransport, setSelectedTransport] = useState(null);
   const [user, setUser] = useState(null);
+  const [latitude, setLatitude] = useState(route.params?.latitude || null);
+  const [longitude, setLongitude] = useState(route.params?.longitude || null);
   const LCforMap = route.params?.locationName;
   const [locationName, setLocationName] = useState(LCforMap || "");
-  const [searchLCT, setsearchLCT] = useState("");
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [placeholder, setPlaceholder] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const placeholderTexts = [
     "어떤 게 가장 기억에 남았나요?",
@@ -42,6 +43,8 @@ export default function WriteDiaryScreen({route, navigation}) {
     { id: 8, name: "배", icon: "ferry" },
   ];
 
+  const [placeholder, setPlaceholder] = useState("");
+
   useEffect(() => {
     const randomText = placeholderTexts[Math.floor(Math.random() * placeholderTexts.length)];
     setPlaceholder(randomText);
@@ -53,31 +56,6 @@ export default function WriteDiaryScreen({route, navigation}) {
     });
     return unsubscribe;
   }, []);
-
-  const handleSearchLocation = async () => {
-    if (!searchLCT) {
-      Alert.alert("주소를 입력하세요.");
-      return;
-    }
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("위치권한이 필요합니다.");
-        return;
-      }
-      let geo = await Location.geocodeAsync(searchLCT);
-      if (geo.length > 0) {
-        const foundLocation = geo[0];
-        const detailLocation = foundLocation.name || foundLocation.formatAddress || searchLCT;
-        setLocationName(detailLocation);
-        Alert.alert("주소가 설정되었습니다!");
-      } else {
-        Alert.alert("주소를 찾을 수 없습니다");
-      }
-    } catch (error) {
-      Alert.alert("오류 발생", error.message);
-    }
-  };
 
   const handleTransportSelect = (transportId) => {
     if (selectedTransport === transportId) {
@@ -97,7 +75,7 @@ export default function WriteDiaryScreen({route, navigation}) {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 1,
     });
@@ -118,7 +96,7 @@ export default function WriteDiaryScreen({route, navigation}) {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       quality: 1,
     });
@@ -126,24 +104,6 @@ export default function WriteDiaryScreen({route, navigation}) {
     if (!result.canceled) {
       setSelectedMedia([...selectedMedia, ...result.assets]);
       Alert.alert(`${result.assets.length}개의 파일이 추가되었습니다!`);
-    }
-  };
-
-  const handleFiles = async () => {
-    setShowUploadModal(false);
-    
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'video/*'],
-        multiple: true,
-      });
-
-      if (!result.canceled) {
-        setSelectedMedia([...selectedMedia, ...result.assets]);
-        Alert.alert(`${result.assets.length}개의 파일이 추가되었습니다!`);
-      }
-    } catch (error) {
-      Alert.alert('파일 선택 오류', error.message);
     }
   };
 
@@ -161,14 +121,92 @@ export default function WriteDiaryScreen({route, navigation}) {
     return `${year}.${month}.${day}`;
   };
 
-  const handleSave = () => {
+  // Firebase Storage에 사진 업로드
+  const uploadMediaToStorage = async (diaryId) => {
+    if (selectedMedia.length === 0) return true;  // 사진 없으면 그냥 성공으로 반환
+
+    try {
+      for (let i = 0; i < selectedMedia.length; i++) {
+        const media = selectedMedia[i];
+        const fileName = `${Date.now()}_${i}.jpg`;
+        const fileRef = ref(storage, `diaries/${diaryId}/${fileName}`);
+
+        const response = await fetch(media.uri);
+        const blob = await response.blob();
+
+        await uploadBytes(fileRef, blob);
+        console.log(`업로드 완료: ${fileName}`);
+      }
+      return true;
+    } catch (error) {
+      console.error('Storage 업로드 오류:', error);
+      Alert.alert('사진 업로드 실패', error.message);
+      return false;
+    }
+  };
+
+  const handleSave = async () => {
     if (!locationName) {
       Alert.alert('주소가 비어있습니다.', '여행지를 검색해주세요.');
       return;
     }
-    Alert.alert('저장 완료', '여행일기가 저장되었습니다!');
-    navigation.goBack();
+
+    if (!user) {
+      Alert.alert('로그인이 필요합니다.');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      console.log('여행일기 저장 시작...');
+
+      // 1. Firestore에 여행일기 저장
+      const docRef = await addDoc(collection(db, 'travelDiaries'), {
+        userId: user.uid,
+        title: writeText || '제목 없음',
+        location: locationName,
+        latitude: latitude || 37.5665,
+        longitude: longitude || 126.9780,
+        description: writeDiary,
+        transport: selectedTransport,
+        date: selectedDate,
+        createdAt: serverTimestamp(),
+        entries: selectedMedia.length,
+      });
+
+      const diaryId = docRef.id;
+      console.log('Firestore 저장 완료:', diaryId);
+
+      // 2. Storage에 사진 업로드
+      if (selectedMedia.length > 0) {
+        console.log(`${selectedMedia.length}개 파일 업로드 시작...`);
+        const uploadSuccess = await uploadMediaToStorage(diaryId);
+        if (!uploadSuccess) {
+          setSaving(false);
+          return;
+        }
+        console.log('Storage 업로드 완료');
+      }
+
+      Alert.alert('저장 완료', '여행일기가 저장되었습니다!');
+      setSaving(false);
+      navigation.goBack();
+    } catch (error) {
+      console.error('저장 오류:', error);
+      Alert.alert('저장 실패', error.message);
+      setSaving(false);
+    }
   };
+
+  if (saving) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#42b1fa" />
+        <Text style={{ marginTop: 10, color: '#666' }}>저장 중...</Text>
+      </View>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -200,10 +238,10 @@ export default function WriteDiaryScreen({route, navigation}) {
 
           {/* 여행지 선택 */}
           {!locationName || locationName === "" ? (
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-              <Text style={styles.LCTitle1}>여행지</Text>
-              <Text style={[styles.LCSearchInput, {color: '#999'}]}>여행지 선택</Text>
-            </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Home', { focusSearch: true })}>
+            <Text style={styles.LCTitle1}>여행지</Text>
+            <Text style={[styles.LCSearchInput, {color: '#999'}]}>여행지 선택</Text>
+          </TouchableOpacity>
           ) : (
             <View>
               <Text style={styles.LCTitle2}>여행지</Text>
@@ -215,6 +253,16 @@ export default function WriteDiaryScreen({route, navigation}) {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* 제목 입력 */}
+          <Text style={styles.TitleText}>제목</Text>
+          <TextInput
+            style={styles.titleInput}
+            placeholder="여행일기 제목을 입력하세요"
+            value={writeText}
+            onChangeText={setwriteText}
+            placeholderTextColor="#999"
+          />
 
           {/* 교통수단 선택 */}
           <Text style={styles.transportTitle}>여정을 도와준 교통수단</Text>
@@ -231,7 +279,6 @@ export default function WriteDiaryScreen({route, navigation}) {
                   name={transport.icon} 
                   size={32} 
                   color={selectedTransport === transport.id ? '#0baefe' : '#666'}
-                  style={styles.transportIcon}
                 />
                 <Text 
                   style={[
@@ -255,12 +302,12 @@ export default function WriteDiaryScreen({route, navigation}) {
             numberOfLines={10}
           />
 
-          {/* 사진/동영상 추가 */}
+          {/* 사진 추가 */}
           <TouchableOpacity 
             style={styles.uploadButtonContainer}
             onPress={() => setShowUploadModal(true)}
             activeOpacity={0.7}>
-            <Text style={styles.uploadText}>📷 사진/동영상 추가</Text>
+            <Text style={styles.uploadText}>📷 사진 추가</Text>
             {selectedMedia.length > 0 && (
               <Text style={styles.mediaCount}>{selectedMedia.length}개 선택됨</Text>
             )}
@@ -283,7 +330,7 @@ export default function WriteDiaryScreen({route, navigation}) {
             activeOpacity={1}
             onPress={() => setShowUploadModal(false)}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>미디어 추가</Text>
+              <Text style={styles.modalTitle}>사진 추가</Text>
               
               <TouchableOpacity 
                 style={styles.modalOption}
@@ -299,15 +346,6 @@ export default function WriteDiaryScreen({route, navigation}) {
                 onPress={handleGallery}>
                 <Text style={styles.modalOptionIcon}>🖼️</Text>
                 <Text style={styles.modalOptionText}>갤러리에서 선택</Text>
-              </TouchableOpacity>
-
-              <View style={styles.modalDivider} />
-
-              <TouchableOpacity 
-                style={styles.modalOption}
-                onPress={handleFiles}>
-                <Text style={styles.modalOptionIcon}>📁</Text>
-                <Text style={styles.modalOptionText}>파일 선택</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -342,16 +380,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginRight: 20,
+    marginTop: 10,
   },
   dateButton: {
     backgroundColor: 'white',
     padding: 12,
     borderRadius: 7,
-    marginTop: 10,
     flex: 1,
   },
   dateText: {
     fontSize: 16,
+  },
+  titleInput: {
+    backgroundColor: 'white',
+    borderRadius: 7,
+    fontSize: 16,
+    paddingHorizontal: 13,
+    height: 45,
+    paddingVertical: 10,
+    marginBottom: 15,
   },
   LCSearchInput: {
     backgroundColor: 'white',
@@ -365,11 +412,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 10,
+    marginTop: 10,
   },
   LCTitle2:{
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 10,
+    marginTop: 10,
   },
   LCsearchButton: {
     alignItems: 'center',
@@ -380,31 +429,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   }, 
   LCsearchButtonText: {
-    fontSize: 20,
+    fontSize: 16,
     color: 'white',
   },
   DiaryInput: {
     paddingHorizontal: 15,
     paddingVertical: 12,
-    fontSize: 18,
+    fontSize: 16,
     borderRadius: 7,
-    height: 210,
+    height: 180,
     color: '#000',
     backgroundColor: 'white',
     marginBottom: 15,
+    marginTop: 10,
   },
   transportTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '600',
     color: '#000',
-    marginBottom: 8,
-    marginTop: 12,
+    marginBottom: 10,
+    marginTop: 15,
   },
   transportGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 10,
     marginBottom: 15,
   },
   transportButton: {
@@ -416,13 +465,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  transportIcon: {
-    marginBottom: 4,
-  },
   transportText: {
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
+    marginTop: 5,
   },
   selected: {
     backgroundColor: '#e3f2fd',
@@ -437,9 +484,10 @@ const styles = StyleSheet.create({
     width: 'auto',
     alignSelf: 'flex-start',
     marginBottom: 15,
+    marginTop: 10,
   },
   uploadText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: 'black',
   },
@@ -452,10 +500,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#0baefe',
     paddingVertical: 15,
     borderRadius: 7,
-    marginTop: 10,
     alignItems: 'center',
-    paddingVertical: 13,
     justifyContent: 'center',
+    marginTop: 10,
   },
   saveButtonText: {
     color: 'white',
@@ -470,27 +517,27 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'white',
-    borderRadius: 7,
+    borderRadius: 10,
     padding: 20,
-    width: '80%',
+    width: '85%',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 15,
     textAlign: 'center',
   },
   modalOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 15,
   },
   modalOptionIcon: {
-    fontSize: 28,
-    marginRight: 16,
+    fontSize: 24,
+    marginRight: 15,
   },
   modalOptionText: {
-    fontSize: 17,
+    fontSize: 16,
     color: '#212529',
     fontWeight: '500',
   },
@@ -499,14 +546,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#e9ecef',
   },
   modalCancel: {
-    marginTop: 16,
-    paddingVertical: 14,
+    marginTop: 10,
+    paddingVertical: 12,
     alignItems: 'center',
     backgroundColor: '#f8f9fa',
     borderRadius: 7,
   },
   modalCancelText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#6c757d',
     fontWeight: '600',
   },

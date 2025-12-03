@@ -9,12 +9,13 @@ import {
   TouchableOpacity,
   Keyboard,
   TouchableWithoutFeedback,
+  FlatList,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../firebaseConfig";
 import MapView, { Marker } from "react-native-maps";
-import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import * as Location from "expo-location";
 
 export default function HomeScreen({ navigation, route }) {
@@ -22,8 +23,10 @@ export default function HomeScreen({ navigation, route }) {
   const [user, setUser] = useState(null);
   const [searchText, setSearchText] = useState("");
   const [markerCoord, setMarkerCoord] = useState(null);
+  const [autocompleteResults, setAutocompleteResults] = useState([]);
+  const [showResults, setShowResults] = useState(false);
   const mapRef = useRef(null);
-  const placesRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   // 로그인 감시
   useEffect(() => {
@@ -37,7 +40,7 @@ export default function HomeScreen({ navigation, route }) {
   useEffect(() => {
     if (route?.params?.focusSearch) {
       setTimeout(() => {
-        placesRef.current?.focus();
+        searchInputRef.current?.focus();
       }, 300);
     }
   }, [route?.params?.focusSearch]);
@@ -50,6 +53,66 @@ export default function HomeScreen({ navigation, route }) {
     } catch (error) {
       alert("로그아웃 실패: " + error.message);
     }
+  };
+
+  // 자동완성 검색
+  const handleSearchInput = async (text) => {
+    setSearchText(text);
+
+    if (text.length < 2) {
+      setAutocompleteResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${text}&key=AIzaSyDydQh4WXuFGqX6RzAmuxdYmrGJNOhfr1k&language=ko&components=country:kr`
+      );
+      const data = await response.json();
+
+      if (data.predictions) {
+        setAutocompleteResults(data.predictions);
+        setShowResults(true);
+      }
+    } catch (error) {
+      console.error("자동완성 오류:", error);
+    }
+  };
+
+  // 자동완성 항목 선택
+  const handleSelectResult = async (placeId, description) => {
+    setSearchText(description);
+    setShowResults(false);
+    setAutocompleteResults([]);
+
+    try {
+      // Place Details API로 좌표 가져오기
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&key=AIzaSyDydQh4WXuFGqX6RzAmuxdYmrGJNOhfr1k`
+      );
+      const data = await response.json();
+
+      if (data.result?.geometry?.location) {
+        const lat = data.result.geometry.location.lat;
+        const lng = data.result.geometry.location.lng;
+
+        setMarkerCoord({ latitude: lat, longitude: lng });
+        mapRef.current?.animateToRegion(
+          {
+            latitude: lat,
+            longitude: lng,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          },
+          300
+        );
+      }
+    } catch (error) {
+      Alert.alert("오류가 발생했습니다.", error.message);
+    }
+
+    Keyboard.dismiss();
   };
 
   // 수동 검색 버튼
@@ -78,6 +141,7 @@ export default function HomeScreen({ navigation, route }) {
           },
           500
         );
+        setShowResults(false);
       } else {
         Alert.alert("주소를 찾을 수 없습니다.");
       }
@@ -87,7 +151,12 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <TouchableWithoutFeedback
+      onPress={() => {
+        setShowResults(false);
+        Keyboard.dismiss();
+      }}
+    >
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "android" ? "padding" : "height"}
@@ -148,70 +217,59 @@ export default function HomeScreen({ navigation, route }) {
 
         {/* 검색 박스 */}
         <View style={styles.searchContainer}>
-          <GooglePlacesAutocomplete
-            ref={placesRef}
-            placeholder="주소를 입력하세요"
-            fetchDetails={true}
-            enablePoweredByContainer={false}
-            debounce={200}
+          <View style={styles.searchInputWrapper}>
+            <TextInput
+              ref={searchInputRef}
+              style={styles.searchInput}
+              placeholder="주소를 입력하세요"
+              placeholderTextColor="#999"
+              value={searchText}
+              onChangeText={handleSearchInput}
+              onFocus={() => searchText.length > 0 && setShowResults(true)}
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={() => {
+                  setSearchText("");
+                  setAutocompleteResults([]);
+                  setShowResults(false);
+                }}
+              >
+                <Ionicons name="close-circle" size={20} color="#999" />
+              </TouchableOpacity>
+            )}
+          </View>
 
-            onPress={(data, details) => {
-              // 자동완성 닫히도록 포커스 제거
-              placesRef.current?.blur();
-              Keyboard.dismiss();
-
-              const location = details?.geometry?.location;
-              if (!location) return;
-
-              const lat = location.lat;
-              const lng = location.lng;
-
-              setSearchText(data.description);
-              placesRef.current?.setAddressText(data.description);
-
-              // 마커 & 지도 이동
-              setMarkerCoord({ latitude: lat, longitude: lng });
-              mapRef.current?.animateToRegion(
-                {
-                  latitude: lat,
-                  longitude: lng,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                },
-                300
-              );
-            }}
-
-            textInputProps={{
-              placeholderTextColor: "#999",
-              onChangeText: (t) => setSearchText(t),
-            }}
-
-            query={{
-              key: "AIzaSyDydQh4WXuFGqX6RzAmuxdYmrGJNOhfr1k",
-              language: "ko",
-            }}
-
-            styles={googlePlacesStyles}
-          />
+          {/* 자동완성 결과 */}
+          {showResults && autocompleteResults.length > 0 && (
+            <FlatList
+              data={autocompleteResults}
+              keyExtractor={(item) => item.place_id}
+              scrollEnabled={true}
+              nestedScrollEnabled={true}
+              style={styles.resultsList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.resultItem}
+                  onPress={() =>
+                    handleSelectResult(item.place_id, item.description)
+                  }
+                >
+                  <Ionicons name="location" size={16} color="#0baefe" />
+                  <Text style={styles.resultText}>{item.description}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
 
           {/* 수동 검색 버튼 */}
-          <TouchableOpacity style={styles.searchButton} onPress={handleManualSearch}>
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={handleManualSearch}
+          >
             <Text style={styles.searchButtonText}>검색</Text>
           </TouchableOpacity>
-
-          {/* 검색창 X 버튼 */}
-          {searchText.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={() => {
-                setSearchText("");
-                placesRef.current?.setAddressText("");
-              }}
-            >
-              <Ionicons name="close-circle" size={20} color="#999" />
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* 메뉴 버튼 */}
@@ -292,6 +350,28 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
+  searchInputWrapper: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  searchInput: {
+    flex: 1,
+    height: 45,
+    backgroundColor: "white",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 16,
+    elevation: 3,
+  },
+
+  clearButton: {
+    position: "absolute",
+    right: 10,
+    padding: 5,
+  },
+
   searchButton: {
     backgroundColor: "#0baefe",
     padding: 10,
@@ -306,12 +386,27 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  clearButton: {
-    position: "absolute",
-    right: 10,
-    top: 8.5,
-    padding: 5,
-    zIndex: 11,
+  resultsList: {
+    backgroundColor: "white",
+    borderRadius: 8,
+    marginTop: 5,
+    elevation: 5,
+    maxHeight: 250,
+  },
+
+  resultItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#e0e0e0",
+  },
+
+  resultText: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: "#333",
+    flex: 1,
   },
 
   menuButton: {
@@ -340,23 +435,3 @@ const styles = StyleSheet.create({
   userEmail: { fontWeight: "bold" },
   menuItem: { fontSize: 16, marginVertical: 8 },
 });
-
-const googlePlacesStyles = {
-  container: { flex: 0 },
-  textInputContainer: { padding: 0 },
-  textInput: {
-    height: 45,
-    backgroundColor: "white",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    fontSize: 16,
-    elevation: 3,
-  },
-  listView: {
-    backgroundColor: "white",
-    borderRadius: 8,
-    marginTop: 5,
-    elevation: 5,
-  },
-};
-
