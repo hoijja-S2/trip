@@ -1,17 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  TouchableOpacity,
-  Keyboard,
-  TouchableWithoutFeedback,
-  FlatList,
-  TextInput,
-} from "react-native";
+import {View,Text,StyleSheet,KeyboardAvoidingView,Platform,Alert,TouchableOpacity,
+  Keyboard,TouchableWithoutFeedback,FlatList,TextInput,} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../firebaseConfig";
@@ -50,6 +39,7 @@ export default function HomeScreen({ navigation, route }) {
     try {
       await signOut(auth);
       alert("로그아웃 완료");
+      setMenuOpen(false);
     } catch (error) {
       alert("로그아웃 실패: " + error.message);
     }
@@ -115,41 +105,6 @@ export default function HomeScreen({ navigation, route }) {
     Keyboard.dismiss();
   };
 
-  // 수동 검색 버튼
-  const handleManualSearch = async () => {
-    if (!searchText) return;
-
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("위치 권한이 필요합니다.");
-        return;
-      }
-
-      let geo = await Location.geocodeAsync(searchText);
-      if (geo.length > 0) {
-        const { latitude, longitude } = geo[0];
-
-        setMarkerCoord({ latitude, longitude });
-
-        mapRef.current?.animateToRegion(
-          {
-            latitude,
-            longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          },
-          500
-        );
-        setShowResults(false);
-      } else {
-        Alert.alert("주소를 찾을 수 없습니다.");
-      }
-    } catch (error) {
-      Alert.alert("오류가 발생했습니다.", error.message);
-    }
-  };
-
   return (
     <TouchableWithoutFeedback
       onPress={() => {
@@ -178,7 +133,8 @@ export default function HomeScreen({ navigation, route }) {
               title="선택한 위치"
               description={searchText || undefined}
               onPress={async () => {
-                if (user) {
+                // diaryId가 있으면 (WriteDiaryScreen에서 온 경우)
+                if (route.params?.diaryId) {
                   let realLC = searchText;
                   try {
                     let address = await Location.reverseGeocodeAsync({
@@ -193,23 +149,18 @@ export default function HomeScreen({ navigation, route }) {
                     }
                   } catch {}
 
+                  // WriteDiaryScreen으로 돌아가기
                   navigation.navigate("writediary", {
+                    diaryId: route.params.diaryId,
                     latitude: markerCoord.latitude,
                     longitude: markerCoord.longitude,
                     locationName: realLC,
+                    draftData: route.params.draftData,
                   });
 
                   setMenuOpen(false);
-                } else {
-                  Alert.alert(
-                    "!로그인 필요!",
-                    "글쓰기를 하려면 로그인이 필요합니다.",
-                    [
-                      { text: "취소", style: "cancel" },
-                      { text: "로그인", onPress: () => navigation.navigate("Login") },
-                    ]
-                  );
                 }
+                // diaryId가 없으면 (그냥 Home에서 온 경우) 아무것도 안 함
               }}
             />
           )}
@@ -262,14 +213,6 @@ export default function HomeScreen({ navigation, route }) {
               )}
             />
           )}
-
-          {/* 수동 검색 버튼 */}
-          <TouchableOpacity
-            style={styles.searchButton}
-            onPress={handleManualSearch}
-          >
-            <Text style={styles.searchButtonText}>검색</Text>
-          </TouchableOpacity>
         </View>
 
         {/* 메뉴 버튼 */}
@@ -298,15 +241,6 @@ export default function HomeScreen({ navigation, route }) {
                   <Text style={styles.menuItem}>내 여행 목록</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() => {
-                    setMenuOpen(false);
-                    navigation.navigate("writediary");
-                  }}
-                >
-                  <Text style={styles.menuItem}>일기 쓰기</Text>
-                </TouchableOpacity>
-
                 <TouchableOpacity onPress={handleLogout}>
                   <Text style={[styles.menuItem, { color: "red" }]}>로그아웃</Text>
                 </TouchableOpacity>
@@ -321,13 +255,14 @@ export default function HomeScreen({ navigation, route }) {
                 >
                   <Text style={styles.menuItem}>로그인</Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   onPress={() => {
                     setMenuOpen(false);
-                    navigation.navigate("diarylist");
+                    navigation.navigate("sign_up");
                   }}
                 >
-                  <Text style={styles.menuItem}>내 여행 목록</Text>
+                  <Text style={styles.menuItem}>회원가입</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -370,20 +305,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 10,
     padding: 5,
-  },
-
-  searchButton: {
-    backgroundColor: "#0baefe",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-
-  searchButtonText: {
-    color: "white",
-    fontSize: 15,
-    fontWeight: "bold",
   },
 
   resultsList: {

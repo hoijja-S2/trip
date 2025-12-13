@@ -13,6 +13,11 @@ export default function LoginScreen() {
   const navigation = useNavigation();
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("입력 오류", "이메일과 비밀번호를 입력해주세요.");
+      return;
+    }
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
       navigation.reset({ index: 0, routes: [{ name: "Home" }] });
@@ -32,6 +37,7 @@ export default function LoginScreen() {
         <TextInput
           style={styles.inputID}
           placeholder="ID(e-mail)"
+          placeholderTextColor="#999"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -39,21 +45,22 @@ export default function LoginScreen() {
         <TextInput
           style={styles.inputPS}
           placeholder="Password"
+          placeholderTextColor="#999"
           value={password}
           secureTextEntry={true}
           autoCorrect={false}
           autoComplete="off"
           onChangeText={setPassword}
         />
-        <TouchableOpacity style = {styles.Button} onPress = {handleLogin}>
-          <Text style = {styles.buttonText}>로그인</Text>
+        <TouchableOpacity style={styles.Button} onPress={handleLogin}>
+          <Text style={styles.buttonText}>로그인</Text>
         </TouchableOpacity>
         <Text style={styles.link} onPress={() => navigation.navigate("sign_up")}>
           No account? Sign up
         </Text>
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
-);
+  );
 }
 
 const styles = StyleSheet.create({
@@ -69,13 +76,12 @@ const styles = StyleSheet.create({
   },
   title: { 
     fontSize: 32,
-    fontWeight: "800", // 더 굵게
+    fontWeight: "800",
     textAlign: "center",
     color: '#1a1a1a',
     letterSpacing: -0.5,
   },
   inputID: { 
-    borderColor: "#000000ff",
     paddingHorizontal: 15,
     fontSize: 20,
     marginTop: 50,
@@ -89,7 +95,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   inputPS: {
-    borderColor: "#000000ff",
     paddingHorizontal: 15,
     fontSize: 20,
     marginLeft: 50,
@@ -108,7 +113,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   Button: {
-    backgroundColor: '#42b1faff',
+    backgroundColor: '#0baefe',
     padding: 10,
     borderRadius: 8,
     alignItems: 'center',

@@ -19,15 +19,25 @@ export default function Sign_upScreen() {
     }
     Alert.alert("중복 확인", "사용 가능한 이메일 입니다.");
   };
+
   const handlePS = async () => {
-    if (passwordF !== passwordR) {
-      Alert.alert("가입 실패", "비밀 번호 불일치");
+    if (!email) {
+      Alert.alert("이메일 입력", "이메일을 입력해 주세요.");
       return;
     }
 
-    if (password)
+    if (!passwordF || !passwordR) {
+      Alert.alert("비밀번호 입력", "비밀번호를 입력해 주세요.");
+      return;
+    }
+
+    if (passwordF !== passwordR) {
+      Alert.alert("가입 실패", "비밀번호 불일치");
+      return;
+    }
+
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      await createUserWithEmailAndPassword(auth, email, passwordF);
       Alert.alert("회원가입 성공!", "이제 로그인하세요");
       navigation.navigate("Login");
     } catch (error) {
@@ -46,23 +56,26 @@ export default function Sign_upScreen() {
         <TextInput
           style={styles.inputID}
           placeholder="ID(e-mail)"
+          placeholderTextColor="#999"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"/>
         <TextInput
           style={styles.inputPS1}
           placeholder="Password"
+          placeholderTextColor="#999"
           secureTextEntry
           value={passwordF}
           onChangeText={setPasswordF}/>
         <TextInput
           style={styles.inputPS2}
-          placeholder="Password"
+          placeholder="Password Confirm"
+          placeholderTextColor="#999"
           secureTextEntry
           value={passwordR}
           onChangeText={setPasswordR}/>  
-        <TouchableOpacity style = {styles.Button} onPress = {handlePS}>
-          <Text style = {styles.buttonText}>가입하기</Text>
+        <TouchableOpacity style={styles.Button} onPress={handlePS}>
+          <Text style={styles.buttonText}>가입하기</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>  
     </TouchableWithoutFeedback>  
@@ -82,7 +95,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   Button: {
-    backgroundColor: '#1da4ff7f',
+    backgroundColor: '#0baefe',
     padding: 10,
     borderRadius: 8,
     alignItems: 'center',

@@ -9,7 +9,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyAP0pEA2ywGws1G3YNRSdNID-0G2aReo_E",
   authDomain: "tripapp-8fc99.firebaseapp.com",
   projectId: "tripapp-8fc99",
-  storageBucket: "tripapp-8fc99.appspot.com",
+  storageBucket: "tripapp-8fc99.firebasestorage.app",
   messagingSenderId: "728074923514",
   appId: "1:728074923514:web:1f494c786a17bfcef2c843",
   measurementId: "G-TW3RZ8JSG1"

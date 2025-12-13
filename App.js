@@ -12,6 +12,7 @@ import WriteDiaryScreen from "./screen/writediary";
 import Sign_upScreen from "./screen/sign_up";
 import DiaryListScreen from "./screen/diarylist";
 import DiaryDetailScreen from "./screen/diarydetail";
+import NewPlanScreen from "./screen/newplan";
 
 const Stack = createStackNavigator();
 
@@ -56,6 +57,11 @@ export default function App() {
         <Stack.Screen
           name="diarydetail"
           component={DiaryDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="newplan"
+          component={NewPlanScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

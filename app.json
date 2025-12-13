@@ -12,17 +12,20 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": { 
+    "ios": {
       "supportsTablet": true
     },
-    "android": { 
+    "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions" : ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "edgeToEdgeEnabled": true,
-      "package": "com.AndTripApp.TripApp", 
+      "package": "com.AndTripApp.TripApp",
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
@@ -32,6 +35,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "346101a5-2dda-42ff-aab8-bb076b185eed"
+      }
     }
   }
 }
